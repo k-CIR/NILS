@@ -4,6 +4,7 @@ export * from './job';
 export * from './filesystem';
 export * from './anonymize';
 export * from './extract';
+export * from './meg';
 export * from './system';
 export * from './database';
 export * from './import';

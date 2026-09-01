@@ -193,7 +193,7 @@ class CohortService:
                 self._initialize_pipeline_steps(*pipeline_init_params)
 
             # Enrich DTO with the newly created stages
-            dto.stages = self.get_stages_from_pipeline(dto.id)
+            dto.stages = self.get_stages_from_pipeline(dto.id, dto.modality)
 
         return dto
 
@@ -206,7 +206,7 @@ class CohortService:
             dto = CohortDTO.model_validate(cohort)
 
             # Try to get stages from new pipeline system first
-            pipeline_stages = self.get_stages_from_pipeline(cohort_id)
+            pipeline_stages = self.get_stages_from_pipeline(cohort_id, dto.modality)
             if pipeline_stages:
                 dto.stages = pipeline_stages
             # else: keep stages from JSON column (migration not yet complete)
@@ -238,7 +238,7 @@ class CohortService:
 
             # Enrich with stages from new pipeline system
             for dto in dtos:
-                pipeline_stages = self.get_stages_from_pipeline(dto.id)
+                pipeline_stages = self.get_stages_from_pipeline(dto.id, dto.modality)
                 if pipeline_stages:
                     dto.stages = pipeline_stages
 
@@ -309,16 +309,25 @@ class CohortService:
                 "Failed to reinitialize pipeline steps for cohort %d: %s", cohort_id, e
             )
 
-    def get_stages_from_pipeline(self, cohort_id: int) -> list[dict]:
+    def get_stages_from_pipeline(
+        self, cohort_id: int, modality: str = "imaging"
+    ) -> list[dict]:
         """Get stages array from pipeline steps (new system).
 
         Returns the same format as the old cohorts.stages JSON column
         for backward compatibility with the API.
+
+        Args:
+            cohort_id: The cohort ID.
+            modality: Cohort modality ("imaging" or "meg"); must match the
+                modality the pipeline was initialized with, or every step
+                will fail to match and this returns an empty list (see
+                `nils_pipeline_service.build_stages_response`).
         """
         try:
             from nils_dataset_pipeline import nils_pipeline_service
 
-            return nils_pipeline_service.build_stages_response(cohort_id)
+            return nils_pipeline_service.build_stages_response(cohort_id, modality)
         except Exception as e:
             logger.warning(
                 "Failed to get stages from pipeline for cohort %d: %s", cohort_id, e

@@ -18,6 +18,12 @@ const stageDescriptions: Record<StageId, string> = {
   extract: 'Parse DICOM metadata into the staging catalog for downstream sorting.',
   sort: 'Label, group, and QC imaging sequences using curated heuristics.',
   bids: 'Organize series into BIDS-compliant DICOM or NIfTI outputs.',
+  // MEG cohorts are not covered by these mock/dev fixtures yet (STAGE_ORDER
+  // above stays imaging-only); entries below only satisfy Record<StageId>
+  // exhaustiveness.
+  meg_ingest: 'Discover and stage raw FIF files into the cohort workspace.',
+  meg_scan: 'Read FIF headers, resolve subject identity, and build the BIDS conversion table.',
+  meg_bids: 'Convert staged FIF recordings into a BIDS dataset via mne-bids.',
 };
 
 const nowIso = () => new Date().toISOString();

@@ -19,11 +19,17 @@ interface CohortCardProps {
   cohort: Cohort;
 }
 
+// Note: MEG cohorts never populate STAGE_ORDER-derived stages (see below),
+// so the meg_* entries here exist only to satisfy Record<StageId, string>
+// exhaustiveness and are otherwise unused today.
 const stageAbbreviations: Record<StageId, string> = {
   anonymize: 'A',
   extract: 'E',
   sort: 'S',
   bids: 'B',
+  meg_ingest: 'MI',
+  meg_scan: 'MS',
+  meg_bids: 'MB',
 };
 
 const stageLabels: Record<StageId, string> = {
@@ -31,6 +37,9 @@ const stageLabels: Record<StageId, string> = {
   extract: 'Extract',
   sort: 'Sort',
   bids: 'BIDS',
+  meg_ingest: 'MEG Ingest',
+  meg_scan: 'MEG Scan',
+  meg_bids: 'MEG BIDS',
 };
 
 interface PipelineAnalysis {

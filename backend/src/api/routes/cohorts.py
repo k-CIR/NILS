@@ -248,8 +248,45 @@ def run_cohort_stage(cohort_id: int, stage_id: str, config: dict = Body(default=
         return _run_sort_stage(cohort, stage_idx, merged_config)
     elif stage_id == 'bids':
         return _run_bids_stage(cohort, stage_idx, merged_config)
+    elif stage_id == 'meg_ingest':
+        return _run_meg_ingest_stage(cohort, stage_idx, merged_config)
+    elif stage_id == 'meg_scan':
+        return _run_meg_scan_stage(cohort, stage_idx, merged_config)
+    elif stage_id == 'meg_bids':
+        return _run_meg_bids_stage(cohort, stage_idx, merged_config)
     else:
         raise HTTPException(status_code=501, detail=f"Stage '{stage_id}' not implemented yet")
+
+
+def _run_meg_ingest_stage(cohort, stage_idx: int, merged_config: dict):
+    """Run the MEG ingest stage.
+
+    Stage is recognized (found via `cohort.stages`/pipeline steps for
+    modality="meg" cohorts) but not yet implemented; the real handler lands
+    with `backend/src/meg/ingest.py` (see the MEG parallel track plan, task 6).
+    Config shape: `meg.config.MegIngestConfig`.
+    """
+    raise HTTPException(status_code=501, detail="MEG ingest stage not implemented yet")
+
+
+def _run_meg_scan_stage(cohort, stage_idx: int, merged_config: dict):
+    """Run the MEG scan stage.
+
+    Stage is recognized but not yet implemented; the real handler lands with
+    `backend/src/meg/scanner.py` (see the MEG parallel track plan, task 7).
+    Config shape: `meg.config.MegScanConfig`.
+    """
+    raise HTTPException(status_code=501, detail="MEG scan stage not implemented yet")
+
+
+def _run_meg_bids_stage(cohort, stage_idx: int, merged_config: dict):
+    """Run the MEG BIDS export stage.
+
+    Stage is recognized but not yet implemented; the real handler lands with
+    `backend/src/meg/bids_bridge.py` (see the MEG parallel track plan, task 9).
+    Config shape: `meg.config.MegBidsConfig`.
+    """
+    raise HTTPException(status_code=501, detail="MEG BIDS export stage not implemented yet")
 
 
 def _run_anonymize_stage(cohort, stage_idx: int, merged_config: dict):

@@ -29,7 +29,7 @@ from db.session import SessionLocal
 from . import repository
 from .models import NilsDatasetPipelineStep
 from .ordering import (
-    PIPELINE_STAGES,
+    _stages_for_modality,
     get_pipeline_items,
     get_step_ids_for_stage,
     is_multi_step_stage,
@@ -495,36 +495,49 @@ class NilsDatasetPipelineService:
     # API RESPONSE BUILDERS
     # =========================================================================
     
-    def build_stages_response(self, cohort_id: int) -> list[dict[str, Any]]:
+    def build_stages_response(
+        self,
+        cohort_id: int,
+        modality: str = "imaging",
+    ) -> list[dict[str, Any]]:
         """Build frontend-compatible stages array from pipeline steps.
         
         This returns the same format as the old cohorts.stages JSON column.
         
         Args:
             cohort_id: The cohort ID.
+            modality: Cohort modality ("imaging" or "meg"). Determines which
+                stage-id family (DICOM vs MEG) to look for in `steps`; a
+                mismatch here means every step is filtered out and this
+                returns an empty list. Defaults to "imaging" to preserve
+                existing behaviour for every caller that doesn't know about
+                MEG yet.
             
         Returns:
             List of stage dictionaries for API response.
         """
         with SessionLocal() as session:
             all_steps = repository.get_steps_for_cohort(session, cohort_id)
-            return self._build_stages_from_steps(all_steps)
+            return self._build_stages_from_steps(all_steps, modality)
     
     def _build_stages_from_steps(
         self,
         steps: list[NilsDatasetPipelineStep],
+        modality: str = "imaging",
     ) -> list[dict[str, Any]]:
         """Build stages array from step list.
         
         Args:
             steps: List of pipeline steps.
+            modality: Cohort modality ("imaging" or "meg"); selects which
+                stage-id family to match against `steps`.
             
         Returns:
             List of stage dictionaries.
         """
         stages = []
         
-        for stage_config in PIPELINE_STAGES:
+        for stage_config in _stages_for_modality(modality):
             stage_steps = [s for s in steps if s.stage_id == stage_config["id"]]
             if not stage_steps:
                 continue
