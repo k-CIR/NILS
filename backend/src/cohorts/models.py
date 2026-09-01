@@ -38,6 +38,11 @@ class Cohort(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     tags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     anonymization_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Cohort data modality/type: "imaging" (DICOM MR/CT/PET, current default path)
+    # or "meg" (MEG parallel track). Fixed at creation time; determines which
+    # pipeline stage list is initialized for the cohort. See
+    # nils_dataset_pipeline/ordering.py for the modality-aware stage lists.
+    modality: Mapped[str] = mapped_column(String(20), default='imaging', nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
     status: Mapped[str] = mapped_column(String(50), default='idle', nullable=False)
@@ -65,6 +70,7 @@ class CohortDTO(BaseModel):
     description: Optional[str] = None
     tags: list[str] = []
     anonymization_enabled: bool = False
+    modality: str = 'imaging'
     created_at: datetime
     updated_at: datetime
     status: str = 'idle'
@@ -84,6 +90,11 @@ class CreateCohortPayload(BaseModel):
     tags: list[str] = []
     anonymization_enabled: bool = False
     anonymize_config: Optional[dict] = None
+    # "imaging" (default, current DICOM MR/CT/PET path) or "meg". Only applied
+    # when creating a brand-new cohort; ignored on update of an existing
+    # cohort since changing modality after pipeline initialization would
+    # invalidate already-created pipeline steps.
+    modality: str = 'imaging'
 
 
 # =============================================================================

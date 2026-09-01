@@ -23,6 +23,19 @@ def _normalize_cohort_name(value: str) -> str:
     return normalized
 
 
+VALID_COHORT_MODALITIES = {"imaging", "meg"}
+
+
+def _normalize_cohort_modality(value: str) -> str:
+    normalized = (value or "imaging").strip().lower()
+    if normalized not in VALID_COHORT_MODALITIES:
+        raise ValueError(
+            f"Unknown cohort modality '{value}'. Expected one of: "
+            f"{sorted(VALID_COHORT_MODALITIES)}"
+        )
+    return normalized
+
+
 class CohortService:
     def __init__(self) -> None:
         self._initialized = False
@@ -48,6 +61,19 @@ class CohortService:
                 ensure_migrated()
             except Exception as e:
                 logger.warning("Pipeline migration failed (non-fatal): %s", e)
+
+            # Cohort modality/type column (imaging vs. MEG parallel track).
+            try:
+                from cohorts.migrations.add_cohort_modality_column import (
+                    ensure_migrated as ensure_cohort_modality_column,
+                )
+
+                ensure_cohort_modality_column()
+            except Exception as e:
+                logger.warning(
+                    "Cohort modality-column migration failed (non-fatal): %s",
+                    e,
+                )
 
             # Body Part QC: stage/commit columns (Milestone C).
             try:
@@ -123,6 +149,9 @@ class CohortService:
                 existing.description = payload.description
                 existing.tags = tags
                 existing.anonymization_enabled = payload.anonymization_enabled
+                # Modality is fixed at creation and intentionally not
+                # updated here: changing it after pipeline initialization
+                # would invalidate already-created pipeline steps.
                 existing.updated_at = datetime.now(timezone.utc)
                 session.flush()
                 session.refresh(existing)
@@ -134,6 +163,7 @@ class CohortService:
                     payload.source_path,
                 )
             else:
+                normalized_modality = _normalize_cohort_modality(payload.modality)
                 cohort = repository.create_cohort(
                     session,
                     name=normalized_name,
@@ -141,6 +171,7 @@ class CohortService:
                     description=payload.description,
                     tags=tags,
                     anonymization_enabled=payload.anonymization_enabled,
+                    modality=normalized_modality,
                 )
                 session.refresh(cohort)
                 dto = CohortDTO.model_validate(cohort)
