@@ -416,6 +416,7 @@ class NilsDatasetPipelineService:
         cohort_name: str = "",
         source_path: str = "",
         default_configs: Optional[dict[str, dict[str, Any]]] = None,
+        modality: str = "imaging",
     ) -> list[NilsDatasetPipelineStep]:
         """Initialize pipeline steps for a new cohort.
         
@@ -425,6 +426,8 @@ class NilsDatasetPipelineService:
             cohort_name: Cohort name for default config generation.
             source_path: Source path for default config generation.
             default_configs: Optional dict of stage_id -> config overrides.
+            modality: Cohort modality ("imaging" or "meg"). Defaults to
+                "imaging" to preserve existing behaviour.
             
         Returns:
             List of created pipeline steps.
@@ -437,12 +440,13 @@ class NilsDatasetPipelineService:
                 cohort_name,
                 source_path,
                 default_configs,
+                modality,
             )
             session.commit()
             session.expunge_all()
             logger.info(
-                "Initialized pipeline for cohort=%d: %d steps",
-                cohort_id, len(steps)
+                "Initialized pipeline for cohort=%d (modality=%s): %d steps",
+                cohort_id, modality, len(steps)
             )
             return steps
     
@@ -452,6 +456,7 @@ class NilsDatasetPipelineService:
         anonymization_enabled: bool,
         cohort_name: str = "",
         source_path: str = "",
+        modality: str = "imaging",
     ) -> list[NilsDatasetPipelineStep]:
         """Reinitialize pipeline for a cohort (delete and recreate).
         
@@ -462,6 +467,8 @@ class NilsDatasetPipelineService:
             anonymization_enabled: Whether to include anonymize stage.
             cohort_name: Cohort name for default config generation.
             source_path: Source path for default config generation.
+            modality: Cohort modality ("imaging" or "meg"). Defaults to
+                "imaging" to preserve existing behaviour.
             
         Returns:
             List of created pipeline steps.
@@ -474,12 +481,13 @@ class NilsDatasetPipelineService:
                 anonymization_enabled,
                 cohort_name,
                 source_path,
+                modality=modality,
             )
             session.commit()
             session.expunge_all()
             logger.info(
-                "Reinitialized pipeline for cohort=%d: %d steps",
-                cohort_id, len(steps)
+                "Reinitialized pipeline for cohort=%d (modality=%s): %d steps",
+                cohort_id, modality, len(steps)
             )
             return steps
     

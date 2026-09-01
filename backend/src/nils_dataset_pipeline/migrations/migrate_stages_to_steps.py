@@ -20,7 +20,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.engine import Connection
 
 logger = logging.getLogger(__name__)
@@ -378,9 +378,14 @@ def sync_missing_steps(conn: Connection) -> int:
     
     logger.info("Checking for missing pipeline steps...")
     
-    # Get all cohorts
-    cohorts = conn.execute(text("""
-        SELECT id, name, anonymization_enabled FROM cohorts
+    # Get all cohorts. `modality` may not exist yet on older schemas that
+    # haven't run the cohorts.add_cohort_modality_column migration; fall
+    # back to "imaging" in that case so this stays safe to run in either
+    # order relative to that migration.
+    cohort_cols = {c["name"] for c in inspect(conn).get_columns("cohorts")}
+    modality_select = "modality" if "modality" in cohort_cols else "NULL AS modality"
+    cohorts = conn.execute(text(f"""
+        SELECT id, name, anonymization_enabled, {modality_select} FROM cohorts
     """)).fetchall()
     
     if not cohorts:
@@ -392,9 +397,10 @@ def sync_missing_steps(conn: Connection) -> int:
         cohort_id = cohort_row[0]
         cohort_name = cohort_row[1]
         anonymization_enabled = cohort_row[2] if cohort_row[2] is not None else True
+        modality = cohort_row[3] if cohort_row[3] else "imaging"
         
         # Get expected steps from ordering.py (source of truth)
-        expected_items = get_pipeline_items(anonymization_enabled)
+        expected_items = get_pipeline_items(anonymization_enabled, modality)
         
         # Build lookup: (stage_id, step_id) -> expected sort_order
         expected_order = {

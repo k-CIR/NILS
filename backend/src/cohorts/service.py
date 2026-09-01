@@ -137,7 +137,7 @@ class CohortService:
         tags = [tag for tag in payload.tags if tag.strip()] if payload.tags else []
 
         # Track what we need to initialize after commit
-        pipeline_init_params: tuple[int, bool, str, str] | None = None
+        pipeline_init_params: tuple[int, bool, str, str, str] | None = None
         is_existing = False
         dto: CohortDTO
 
@@ -161,6 +161,7 @@ class CohortService:
                     payload.anonymization_enabled,
                     normalized_name,
                     payload.source_path,
+                    existing.modality,
                 )
             else:
                 normalized_modality = _normalize_cohort_modality(payload.modality)
@@ -180,6 +181,7 @@ class CohortService:
                     payload.anonymization_enabled,
                     normalized_name,
                     payload.source_path,
+                    normalized_modality,
                 )
 
         # Initialize pipeline AFTER the cohort is committed
@@ -265,6 +267,7 @@ class CohortService:
         anonymization_enabled: bool,
         cohort_name: str,
         source_path: str,
+        modality: str = "imaging",
     ) -> None:
         """Initialize pipeline steps for a new cohort."""
         try:
@@ -275,6 +278,7 @@ class CohortService:
                 anonymization_enabled=anonymization_enabled,
                 cohort_name=cohort_name,
                 source_path=source_path,
+                modality=modality,
             )
         except Exception as e:
             logger.warning(
@@ -287,6 +291,7 @@ class CohortService:
         anonymization_enabled: bool,
         cohort_name: str,
         source_path: str,
+        modality: str = "imaging",
     ) -> None:
         """Reinitialize pipeline steps for an existing cohort (recreates all steps)."""
         try:
@@ -297,6 +302,7 @@ class CohortService:
                 anonymization_enabled=anonymization_enabled,
                 cohort_name=cohort_name,
                 source_path=source_path,
+                modality=modality,
             )
         except Exception as e:
             logger.warning(

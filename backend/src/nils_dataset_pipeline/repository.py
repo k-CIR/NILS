@@ -366,6 +366,7 @@ def initialize_pipeline(
     cohort_name: str = "",
     source_path: str = "",
     default_configs: Optional[dict[str, dict[str, Any]]] = None,
+    modality: str = "imaging",
 ) -> list[NilsDatasetPipelineStep]:
     """Create all pipeline steps for a new cohort.
     
@@ -376,11 +377,14 @@ def initialize_pipeline(
         cohort_name: Cohort name for default config generation.
         source_path: Source path for default config generation.
         default_configs: Optional dict of stage_id -> config overrides.
+        modality: Cohort modality ("imaging" or "meg"). Selects which
+            stage list (DICOM vs. MEG) is initialized. Defaults to
+            "imaging" to preserve existing behaviour.
         
     Returns:
         List of created pipeline steps.
     """
-    items = get_pipeline_items(anonymization_enabled)
+    items = get_pipeline_items(anonymization_enabled, modality)
     created_steps = []
     is_first = True
     
@@ -392,12 +396,13 @@ def initialize_pipeline(
         else:
             # Only set config for the first step of each stage
             # (for multi-step stages, config is on the first step)
-            stage_step_ids = get_step_ids_for_stage(item["stage_id"])
+            stage_step_ids = get_step_ids_for_stage(item["stage_id"], modality)
             if not stage_step_ids or item["step_id"] == stage_step_ids[0]:
                 config = get_default_stage_config(
                     item["stage_id"],
                     cohort_name,
                     source_path,
+                    modality,
                 )
         
         step = NilsDatasetPipelineStep(
