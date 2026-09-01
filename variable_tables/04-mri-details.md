@@ -1,0 +1,43 @@
+# MRI detail table
+
+| Variable | MR | CT | PET | MEG | BIDS |
+|---|---:|---:|---:|---:|---|
+| `mri_series_details.mr_acquisition_type` | ✓ | — | — | — | `filename` |
+| `mri_series_details.angio_flag` | ✓ | — | — | — | — |
+| `mri_series_details.repetition_time` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.echo_time` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.inversion_time` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.inversion_times` | ✓ | — | — | — | — |
+| `mri_series_details.flip_angle` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.phase_contrast` | ✓ | — | — | — | — |
+| `mri_series_details.number_of_averages` | ✓ | — | — | — | — |
+| `mri_series_details.imaging_frequency` | ✓ | — | — | — | — |
+| `mri_series_details.imaged_nucleus` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.echo_numbers` | ✓ | — | — | — | `filename` |
+| `mri_series_details.magnetic_field_strength` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.number_of_phase_encoding_steps` | ✓ | — | — | — | — |
+| `mri_series_details.echo_train_length` | ✓ | — | — | — | — |
+| `mri_series_details.percent_sampling` | ✓ | — | — | — | — |
+| `mri_series_details.percent_phase_field_of_view` | ✓ | — | — | — | — |
+| `mri_series_details.pixel_bandwidth` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.receive_coil_name` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.transmit_coil_name` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.acquisition_matrix` | ✓ | — | — | — | — |
+| `mri_series_details.phase_encoding_direction` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.sar` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.dbdt` | ✓ | — | — | — | — |
+| `mri_series_details.b1rms` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.temporal_position_identifier` | ✓ | — | — | — | — |
+| `mri_series_details.number_of_temporal_positions` | ✓ | — | — | — | — |
+| `mri_series_details.temporal_resolution` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.diffusion_b_value` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.diffusion_gradient_orientation` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.diffusion_directionality` | ✓ | — | — | — | — |
+| `mri_series_details.parallel_acquisition_technique` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.parallel_reduction_factor_in_plane` | ✓ | — | — | — | `sidecar` |
+| `mri_series_details.dwi_siemens_b_value` | ✓ | — | — | — | — |
+| `mri_series_details.dwi_siemens_directionality` | ✓ | — | — | — | — |
+| `mri_series_details.dwi_siemens_pe_dir_positive` | ✓ | — | — | — | — |
+| `mri_series_details.dwi_ge_b_value` | ✓ | — | — | — | — |
+| `mri_series_details.dwi_ge_n_directions` | ✓ | — | — | — | — |
+| `mri_series_details.dwi_philips_b_value` | ✓ | — | — | — | — |
