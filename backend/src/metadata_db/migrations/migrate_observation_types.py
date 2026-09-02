@@ -47,6 +47,9 @@ OBSERVATION_TYPES_SEED = [
     # Anthropometric — body measurements recorded over time
     {"observation_type_id": 14, "category": "Anthropometric",       "name": "Weight",         "value_type": "Numeric", "unit": "kg",  "min_value": 0, "max_value": 500, "is_primary": 0, "description": "Body weight"},
     {"observation_type_id": 15, "category": "Anthropometric",       "name": "Height",         "value_type": "Numeric", "unit": "m",   "min_value": 0, "max_value": 3,   "is_primary": 0, "description": "Body height"},
+
+    # Imaging — MEG (parallel track alongside MR/CT/PET, see id 11-13)
+    {"observation_type_id": 16, "category": "Imaging",              "name": "MEG Scan",       "value_type": None, "unit": None, "min_value": None, "max_value": None, "is_primary": 0, "description": "MEG recording session performed"},
 ]
 
 

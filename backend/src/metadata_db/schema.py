@@ -832,3 +832,110 @@ class IngestConflict(Base):
     message: Mapped[str] = mapped_column(Text, nullable=False)
     file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     resolved: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
+class MegAcquisition(Base):
+    """A single MEG recording (raw .fif file, with split continuations merged).
+
+    Plays the role `series`/`*_series_details` play for DICOM modalities, but
+    MEG sessions reuse the shared `study` table (with `modality="MEG"`)
+    instead of `series`/`instance`/`series_stack`/`stack_fingerprint`, since
+    those DICOM-shaped tables don't map cleanly onto MEG acquisitions (see
+    plan Decisions). Column set follows
+    `variable_tables/12-proposed-meg-fields.md` plus the infra columns
+    (FKs, upsert key, timestamps) every other modality-details table needs.
+
+    `meg_epoch` (also proposed in that doc) is intentionally NOT created as a
+    table yet: phase 1 stages only handle continuous raw data, so there is no
+    producer of epoch-level rows until `meg_qc`/`meg_maxfilter` land.
+    """
+
+    __tablename__ = "meg_acquisition"
+    __table_args__ = (
+        # Upsert key for meg_scan re-runs (mirrors series_instance_uid unique
+        # on Series/`*SeriesDetails`) — MEG has no native DICOM-style UID, so
+        # (study_id, fif_file_path) identifies "the same recording" instead.
+        UniqueConstraint("study_id", "fif_file_path", name="uq_meg_acquisition_study_fif_path"),
+    )
+
+    meg_acquisition_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    study_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("study.study_id", ondelete="CASCADE"), nullable=False
+    )
+    subject_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("subject.subject_id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Raw session label as parsed/resolved before subject/session identity
+    # resolution (see meg.parsing.bids_path_from_rawname's session_label arg).
+    session_label: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Source file
+    fif_file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Number of split (`-1.fif`, `-2.fif`, ...) continuation files merged into
+    # this single logical acquisition (see meg.parsing.get_split_file_parts).
+    split_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # BIDS entities parsed from the source filename (see meg.parsing), stored
+    # so the meg_bids stage can reconstruct the exact BIDSPath without
+    # re-parsing the raw filename. Named bids_* (not e.g. `acquisition`) to
+    # avoid colliding with the DICOM sense of "acquisition" used elsewhere.
+    bids_task: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bids_run: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bids_acq_label: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bids_processing_label: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bids_datatype: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Recording metadata (proposed MEG fields — see variable_tables/12-proposed-meg-fields.md)
+    acquisition_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    device: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sampling_frequency: Mapped[float | None] = mapped_column(Float, nullable=True)
+    n_channels: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    highpass_hz: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lowpass_hz: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Comma-separated list of notch frequencies (MNE reports these as an array).
+    notch_filter_hz: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Written back by the meg_bids stage (task 9): conversion status
+    # ("run"/"check"/"processed"/"skip"/"missing"/"error", see
+    # meg.conversion_table.CONVERSION_COLUMNS's "status" column) plus the
+    # resulting BIDS location.
+    bids_status: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bids_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bids_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default=_utc_now_iso,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+    updated_at: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default=_utc_now_iso,
+        server_default=text("CURRENT_TIMESTAMP"),
+        server_onupdate=text("CURRENT_TIMESTAMP"),
+    )
+
+
+class MegChannel(Base):
+    """A single channel (sensor) within a MEG acquisition. See channels.tsv in BIDS."""
+
+    __tablename__ = "meg_channel"
+    __table_args__ = (
+        UniqueConstraint("meg_acquisition_id", "channel_name", name="uq_meg_channel_acquisition_name"),
+    )
+
+    meg_channel_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    meg_acquisition_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("meg_acquisition.meg_acquisition_id", ondelete="CASCADE"), nullable=False
+    )
+    channel_name: Mapped[str] = mapped_column(Text, nullable=False)
+    channel_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    unit: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_bad: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    location_x: Mapped[float | None] = mapped_column(Float, nullable=True)
+    location_y: Mapped[float | None] = mapped_column(Float, nullable=True)
+    location_z: Mapped[float | None] = mapped_column(Float, nullable=True)

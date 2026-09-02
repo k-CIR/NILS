@@ -369,6 +369,7 @@ export const MetadataTableExplorer = () => {
                 <Tabs.Tab value="subjects">Subjects & Cohorts</Tabs.Tab>
                 <Tabs.Tab value="events">Events & Clinical</Tabs.Tab>
                 <Tabs.Tab value="imaging">Imaging</Tabs.Tab>
+                <Tabs.Tab value="meg">MEG</Tabs.Tab>
                 <Tabs.Tab value="system">System</Tabs.Tab>
               </Tabs.List>
 
@@ -393,6 +394,10 @@ export const MetadataTableExplorer = () => {
 
               <Tabs.Panel value="imaging" pt="md">
                 {renderTableButtons(['study', 'series', 'series_stack', 'stack_fingerprint', 'mri_series_details', 'ct_series_details', 'pet_series_details', 'series_classification_cache', 'instance'])}
+              </Tabs.Panel>
+
+              <Tabs.Panel value="meg" pt="md">
+                {renderTableButtons(['meg_acquisition', 'meg_channel'])}
               </Tabs.Panel>
 
               <Tabs.Panel value="system" pt="md">

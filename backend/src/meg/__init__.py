@@ -20,6 +20,7 @@ from .config import (  # noqa: F401
 )
 from .conversion_table import CONVERSION_COLUMNS  # noqa: F401
 from .copy_utils import check_fif, check_match, copy_data, copy_file_or_dir, copy_squid_databases  # noqa: F401
+from .ingest import MegIngestResult, discover_fif_files, run_meg_ingest  # noqa: F401
 from .parsing import (  # noqa: F401
     bids_path_from_rawname,
     extract_info_from_filename,

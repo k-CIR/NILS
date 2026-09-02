@@ -33,6 +33,7 @@ MODALITY_TO_OBSERVATION_TYPE: dict[str, int] = {
     "CT": 12,
     "PT": 13,
     "PET": 13,
+    "MEG": 16,
 }
 
 

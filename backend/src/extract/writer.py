@@ -51,7 +51,7 @@ ProgressCallback = Callable[[int, int], Awaitable[None] | None]
 _CONTROL_POLL_SECONDS = 0.5
 
 # Imaging modality -> observation_type_id for session event creation
-_MODALITY_TO_OBSERVATION_TYPE: dict[str, int] = {"MR": 11, "CT": 12, "PT": 13, "PET": 13}
+_MODALITY_TO_OBSERVATION_TYPE: dict[str, int] = {"MR": 11, "CT": 12, "PT": 13, "PET": 13, "MEG": 16}
 
 # Retry configuration for transient database errors (e.g., OOM under memory pressure)
 # We retry indefinitely for transient errors - never skip data

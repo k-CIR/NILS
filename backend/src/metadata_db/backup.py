@@ -33,6 +33,10 @@ TABLES_TO_DROP_BEFORE_RESTORE = [
     "series_stack",
     # series depends on study and subject
     "series",
+    # meg_channel depends on meg_acquisition
+    "meg_channel",
+    # meg_acquisition depends on study and subject
+    "meg_acquisition",
     # study depends on subject
     "study",
     # Clinical/metadata tables

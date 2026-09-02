@@ -25,6 +25,7 @@ import {
   IconFile,
   IconArrowsRandom,
   IconChartBar,
+  IconBrain,
 } from '@tabler/icons-react';
 import type { DatabaseSummary } from '../../../types';
 
@@ -65,7 +66,11 @@ const TABLE_CONFIG: Record<string, { icon: React.ElementType; color: string; lab
   pet_series_details: { icon: IconBox, color: 'teal', label: 'PET Details' },
   series_classification_cache: { icon: IconTag, color: 'orange', label: 'Classifications' },
   instances: { icon: IconPhoto, color: 'blue', label: 'Instances' },
-  
+
+  // Metadata DB - MEG
+  meg_acquisitions: { icon: IconBrain, color: 'indigo', label: 'MEG Acquisitions' },
+  meg_channels: { icon: IconActivity, color: 'violet', label: 'MEG Channels' },
+
   // Metadata DB - System
   ingest_conflicts: { icon: IconAlertTriangle, color: 'yellow', label: 'Conflicts' },
   schema_versions: { icon: IconHistory, color: 'gray', label: 'Schema Versions' },

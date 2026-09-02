@@ -85,6 +85,18 @@ INDEXES = [
         "instance",
         "series_stack_id, instance_number, dicom_file_path",
     ),
+
+    # =========================================================================
+    # MEG Parallel Track Performance
+    # =========================================================================
+    # Supports meg_scan upserts and study->meg_acquisition joins (cohort stats)
+    ("idx_meg_acquisition_study_id", "meg_acquisition", "study_id"),
+    # Supports subject-scoped MEG acquisition lookups
+    ("idx_meg_acquisition_subject_id", "meg_acquisition", "subject_id"),
+    # Supports meg_bids stage queries filtering by conversion status
+    ("idx_meg_acquisition_bids_status", "meg_acquisition", "bids_status"),
+    # Supports channels.tsv lookups for a given acquisition
+    ("idx_meg_channel_acquisition_id", "meg_channel", "meg_acquisition_id"),
 ]
 
 

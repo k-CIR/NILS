@@ -63,6 +63,8 @@ _TABLE_DEFINITIONS: Sequence[tuple[type, str, Sequence[str] | None]] = (
     (schema.PETSeriesDetails, "PET Series Details", ("series_id",)),
     (schema.SeriesClassificationCache, "Series Classification Cache", ("series_stack_id",)),
     (schema.Instance, "Instances", ("instance_id",)),
+    (schema.MegAcquisition, "MEG Acquisitions", ("meg_acquisition_id",)),
+    (schema.MegChannel, "MEG Channels", ("meg_channel_id",)),
     (schema.IngestConflict, "Ingest Conflicts", ("id",)),
     (schema.SchemaVersion, "Schema Versions", ("id",)),
 )

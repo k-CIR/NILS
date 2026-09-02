@@ -54,6 +54,8 @@ _METADATA_COUNT_TABLES: tuple[tuple[str, str], ...] = (
     ("pet_series_details", "pet_series_details"),
     ("series_classification_cache", "series_classification_cache"),
     ("instances", "instance"),
+    ("meg_acquisitions", "meg_acquisition"),
+    ("meg_channels", "meg_channel"),
     ("ingest_conflicts", "ingest_conflicts"),  # plural
     ("schema_versions", "schema_version"),
 )
