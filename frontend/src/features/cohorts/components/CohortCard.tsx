@@ -10,7 +10,7 @@ import { Badge, Box, Card, Group, Stack, Text, Tooltip } from '@mantine/core';
 import { IconShieldCheck } from '@tabler/icons-react';
 import { Link } from 'react-router-dom';
 import type { Cohort, StageStatus, StageSummary, StageId } from '../../../types';
-import { STAGE_ORDER } from '../../../types';
+import { STAGE_ORDER, MEG_STAGE_ORDER } from '../../../types';
 import { STAGE_STATUS_CONFIG } from '../../../constants/status';
 import { usePrefetchCohort } from '../api';
 import { formatDateTime } from '../../../utils/formatters';
@@ -19,9 +19,6 @@ interface CohortCardProps {
   cohort: Cohort;
 }
 
-// Note: MEG cohorts never populate STAGE_ORDER-derived stages (see below),
-// so the meg_* entries here exist only to satisfy Record<StageId, string>
-// exhaustiveness and are otherwise unused today.
 const stageAbbreviations: Record<StageId, string> = {
   anonymize: 'A',
   extract: 'E',
@@ -56,11 +53,14 @@ interface PipelineAnalysis {
 function analyzePipeline(cohort: Cohort): PipelineAnalysis {
   const stageMap = new Map<StageId, StageSummary>();
   cohort.stages.forEach(stage => stageMap.set(stage.id, stage));
-  
-  // Filter stages based on whether anonymization is enabled
-  const relevantStages = cohort.anonymization_enabled 
-    ? STAGE_ORDER 
-    : STAGE_ORDER.filter(id => id !== 'anonymize');
+
+  // MEG cohorts use a disjoint stage-id family (meg_ingest/meg_scan/meg_bids)
+  // instead of the DICOM anonymize/extract/sort/bids pipeline.
+  const relevantStages = cohort.modality === 'meg'
+    ? MEG_STAGE_ORDER
+    : cohort.anonymization_enabled
+      ? STAGE_ORDER
+      : STAGE_ORDER.filter(id => id !== 'anonymize');
   
   const stages = relevantStages.map(id => {
     const stage = stageMap.get(id);

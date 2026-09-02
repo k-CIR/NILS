@@ -7,6 +7,7 @@ import {
   Loader,
   Modal,
   Paper,
+  SegmentedControl,
   Select,
   SimpleGrid,
   Stack,
@@ -18,7 +19,7 @@ import {
   useCombobox,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import type { Cohort } from '../../../types/cohort';
+import type { Cohort, CohortModality } from '../../../types/cohort';
 import type { SubjectCohortMetadataCohort } from '../../database/api';
 import { useCreateCohortMutation, useCohortsQuery } from '../api';
 import { useMetadataCohorts, useUpsertMetadataCohort } from '../../database/api';
@@ -169,6 +170,7 @@ export const CohortCreateModal = ({ opened, onClose }: CohortCreateModalProps) =
   const [sourcePathState, setSourcePathState] = useState(() => availableRoots[0] ?? fallbackRoot);
   const [description, setDescription] = useState('');
   const [owner, setOwner] = useState('');
+  const [modality, setModality] = useState<CohortModality>('imaging');
   const [anonymizationEnabled, setAnonymizationEnabled] = useState(false);
   const [tags, setTags] = useState<string[]>(['demo']);
 
@@ -252,6 +254,7 @@ export const CohortCreateModal = ({ opened, onClose }: CohortCreateModalProps) =
         description,
         source_path: sourcePath,
         anonymization_enabled: anonymizationEnabled,
+        modality,
         tags: sanitizedTags,
         anonymize_config,
       });
@@ -265,6 +268,7 @@ export const CohortCreateModal = ({ opened, onClose }: CohortCreateModalProps) =
       setDescription('');
       setOwner('');
       setTags(['demo']);
+      setModality('imaging');
       setAnonymizationEnabled(false);
       setCurrentRoot(defaultRoot);
       setSourcePathState(defaultRoot);
@@ -312,6 +316,7 @@ export const CohortCreateModal = ({ opened, onClose }: CohortCreateModalProps) =
         const draftTags = selectedDraft.tags && selectedDraft.tags.length ? [...selectedDraft.tags] : ['demo'];
         setTags(draftTags);
         setAnonymizationEnabled(Boolean(selectedDraft.anonymization_enabled));
+        setModality(selectedDraft.modality ?? 'imaging');
 
         if (!selectedMetadata || !(selectedMetadata.path && selectedMetadata.path.trim())) {
           const draftPath = selectedDraft.source_path;
@@ -336,6 +341,7 @@ export const CohortCreateModal = ({ opened, onClose }: CohortCreateModalProps) =
       } else if (!selectedMetadata) {
         setTags(['demo']);
         setAnonymizationEnabled(false);
+        setModality('imaging');
       }
     } else if (prefillRef.current !== null) {
       prefillRef.current = null;
@@ -344,6 +350,7 @@ export const CohortCreateModal = ({ opened, onClose }: CohortCreateModalProps) =
       setDescription('');
       setTags(['demo']);
       setAnonymizationEnabled(false);
+      setModality('imaging');
       setCurrentRoot(defaultRoot);
       setSourcePathState(defaultRoot);
     }
@@ -359,6 +366,7 @@ export const CohortCreateModal = ({ opened, onClose }: CohortCreateModalProps) =
       setCurrentRoot(firstRoot);
       setSourcePathState(firstRoot);
       setAnonymizationEnabled(false);
+      setModality('imaging');
       prefillRef.current = null;
     }
   }, [opened, availableRoots]);
@@ -448,6 +456,32 @@ export const CohortCreateModal = ({ opened, onClose }: CohortCreateModalProps) =
           ) : null}
         </Stack>
 
+        <Stack gap={4}>
+          <Text size="sm" fw={500}>
+            Data modality
+          </Text>
+          <SegmentedControl
+            value={modality}
+            onChange={(value) => {
+              const next = value as CohortModality;
+              setModality(next);
+              if (next === 'meg') {
+                setAnonymizationEnabled(false);
+              }
+            }}
+            disabled={Boolean(selectedDraft)}
+            data={[
+              { label: 'Imaging (DICOM)', value: 'imaging' },
+              { label: 'MEG', value: 'meg' },
+            ]}
+          />
+          <Text size="xs" c="dimmed">
+            {selectedDraft
+              ? 'Modality is fixed once a cohort pipeline has been created.'
+              : 'Imaging cohorts run anonymize/extract/sort/BIDS; MEG cohorts run a separate ingest/scan/BIDS pipeline.'}
+          </Text>
+        </Stack>
+
         <TextInput
           label="Owner"
           placeholder="Clinical operations"
@@ -517,12 +551,14 @@ export const CohortCreateModal = ({ opened, onClose }: CohortCreateModalProps) =
           onChange={(event) => setDescription(event.currentTarget.value)}
         />
         <TagsInput label="Tags" data={tags} value={tags} onChange={setTags} placeholder="Add pipeline tags" />
-        <Switch
-          label="Add pseudo-anonymization stage"
-          description="Include PHI scrubbing before metadata extraction."
-          checked={anonymizationEnabled}
-          onChange={(event) => setAnonymizationEnabled(event.currentTarget.checked)}
-        />
+        {modality === 'imaging' && (
+          <Switch
+            label="Add pseudo-anonymization stage"
+            description="Include PHI scrubbing before metadata extraction."
+            checked={anonymizationEnabled}
+            onChange={(event) => setAnonymizationEnabled(event.currentTarget.checked)}
+          />
+        )}
         <Group justify="flex-end">
           <Button
             onClick={handleSubmit}

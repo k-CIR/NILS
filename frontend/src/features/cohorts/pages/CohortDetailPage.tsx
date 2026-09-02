@@ -30,6 +30,7 @@ import { findSuggestedActiveIndex } from '../../shared/components/pipelineSteppe
 import { StageCard } from '../../shared/components/StageCard';
 import {
   STAGE_ORDER,
+  MEG_STAGE_ORDER,
   type AnonymizeStageConfig,
   type ExtractStageConfig,
   type StageConfigById,
@@ -53,6 +54,9 @@ import { SortingPipelineSimple } from '../../sorting/components/SortingPipelineS
 import { useRunSortingStep, sortingKeys, type SortingConfig } from '../../sorting';
 import { useIdTypes } from '../../database/api';
 import { BidsStageForm, type BidsConfig } from '../../bids/BidsStageForm';
+import { MegIngestStageForm } from '../../meg/MegIngestStageForm';
+import { MegScanStageForm } from '../../meg/MegScanStageForm';
+import { MegBidsStageForm } from '../../meg/MegBidsStageForm';
 import { KeywordSettingsTab } from '../keywords/KeywordSettingsTab';
 
 // Debug logging disabled for production - uncomment for local debugging
@@ -62,7 +66,21 @@ const debugLog = (_hypothesisId: string, _location: string, _message: string, _d
 };
 
 type StageConfigState = Partial<StageConfigById> & NonAnonymizeStageConfigDefaults;
-type GenericStageId = 'sort' | 'bids';
+type GenericStageId = 'sort' | 'bids' | 'meg_ingest' | 'meg_scan' | 'meg_bids';
+// Stage ids driven by the generic single-job-per-run pattern (job_service +
+// JobSummary polling), as opposed to 'sort' which uses its own bespoke
+// streaming step system (SortingPipelineSimple).
+const JOB_DRIVEN_STAGE_IDS: ReadonlySet<StageId> = new Set(['bids', 'meg_ingest', 'meg_scan', 'meg_bids']);
+// Stage ids whose config is read/written generically via `configs[stageId]`
+// and `handleGenericConfigChange`, without stage-specific state/handlers
+// (unlike 'anonymize' and 'extract').
+const GENERIC_CONFIG_STAGE_IDS: ReadonlySet<StageId> = new Set([
+  'sort',
+  'bids',
+  'meg_ingest',
+  'meg_scan',
+  'meg_bids',
+]);
 
 interface SortingState {
   config: SortingConfig;
@@ -142,6 +160,14 @@ export const CohortDetailPage = () => {
       }
     }
     return options;
+  }, [idTypesResponse]);
+
+  // Same id_types list, without the DICOM-specific "subject_code" pseudo-option:
+  // MEG scan's subjectIdTypeId is `Optional[int]` (None means "use subject
+  // code" already, handled separately by MegScanStageForm).
+  const megSubjectIdTypeOptions = useMemo(() => {
+    if (!idTypesResponse?.items) return [];
+    return idTypesResponse.items.map((idType) => ({ label: idType.name, value: String(idType.id) }));
   }, [idTypesResponse]);
 
   useEffect(() => {
@@ -248,7 +274,8 @@ export const CohortDetailPage = () => {
     if (!cohort) return [];
     const stagesArray = Array.isArray(cohort.stages) ? cohort.stages : [];
     const stageById = Object.fromEntries(stagesArray.map((stage) => [stage.id, stage]));
-    return STAGE_ORDER.map((id) => stageById[id]).filter((stage): stage is StageSummary => Boolean(stage));
+    const stageOrder = cohort.modality === 'meg' ? MEG_STAGE_ORDER : STAGE_ORDER;
+    return stageOrder.map((id) => stageById[id]).filter((stage): stage is StageSummary => Boolean(stage));
   }, [cohort]);
 
   const suggestedStageIndex = useMemo(() => findSuggestedActiveIndex(orderedStages), [orderedStages]);
@@ -274,35 +301,41 @@ export const CohortDetailPage = () => {
   const activeStage = orderedStages[resolvedActiveIndex];
   const activeStageConfig = activeStage ? configs[activeStage.id] : undefined;
   const activeGenericConfig =
-    activeStage && (activeStage.id === 'sort' || activeStage.id === 'bids')
+    activeStage && GENERIC_CONFIG_STAGE_IDS.has(activeStage.id)
       ? (activeStageConfig as Record<string, unknown> | undefined)
       : undefined;
 
-  const bidsStageJobId =
-    activeStage?.id === 'bids' && activeStage.jobId ? Number(activeStage.jobId) : null;
+  // Generic job lookup for any stage that uses the single-job-per-run
+  // pattern (bids, meg_ingest, meg_scan, meg_bids). Only the currently
+  // active stage's jobs are computed, mirroring how each was previously
+  // scoped individually for 'bids'.
+  const jobDrivenStageId =
+    activeStage && JOB_DRIVEN_STAGE_IDS.has(activeStage.id) ? activeStage.id : null;
 
-  const bidsJobs = useMemo(() => {
-    if (!jobs) return [];
-    const filtered = jobs.filter((job) => {
-      if (job.stageId !== 'bids') return false;
+  const jobDrivenStageJobId =
+    jobDrivenStageId && activeStage?.jobId ? Number(activeStage.jobId) : null;
+
+  const jobDrivenStageJobs = useMemo(() => {
+    if (!jobs || !jobDrivenStageId) return [];
+    return jobs.filter((job) => {
+      if (job.stageId !== jobDrivenStageId) return false;
       const matchesCohort = cohort ? job.cohortId === cohort.id : true;
-      const matchesStageJob = bidsStageJobId != null ? job.id === bidsStageJobId : false;
+      const matchesStageJob = jobDrivenStageJobId != null ? job.id === jobDrivenStageJobId : false;
       return matchesCohort || matchesStageJob;
     });
-    return filtered;
-  }, [jobs, cohort, bidsStageJobId]);
+  }, [jobs, cohort, jobDrivenStageId, jobDrivenStageJobId]);
 
   const activeBidsJob = useMemo(
-    () => bidsJobs.find((job) => ['running', 'queued', 'paused'].includes(job.status)),
-    [bidsJobs],
+    () => jobDrivenStageJobs.find((job) => ['running', 'queued', 'paused'].includes(job.status)),
+    [jobDrivenStageJobs],
   );
 
   const lastBidsJob = useMemo(() => {
-    if (!bidsJobs.length) return null;
-    return [...bidsJobs].sort(
+    if (!jobDrivenStageJobs.length) return null;
+    return [...jobDrivenStageJobs].sort(
       (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
     )[0];
-  }, [bidsJobs]);
+  }, [jobDrivenStageJobs]);
 
   const anonymizeConfig = configs.anonymize as AnonymizeStageConfig | undefined;
 
@@ -333,7 +366,7 @@ export const CohortDetailPage = () => {
   const handleGenericConfigChange = (
     stageId: GenericStageId,
     key: string,
-    value: string | number | boolean | string[],
+    value: string | number | boolean | string[] | null,
   ) => {
     setConfigs((prev) => {
       const nextStageConfig = {
@@ -885,6 +918,42 @@ export const CohortDetailPage = () => {
               defaultProvenanceSelection={defaultProvenanceSelection}
               activeBidsJob={activeBidsJob}
               lastBidsJob={lastBidsJob}
+            />
+          )}
+
+          {activeStage.id === 'meg_ingest' && activeGenericConfig && cohort && (
+            <MegIngestStageForm
+              config={activeGenericConfig as unknown as StageConfigById['meg_ingest']}
+              onChange={(key, value) =>
+                handleGenericConfigChange('meg_ingest', key, value as string | number | boolean | string[] | null)
+              }
+              cohortSourcePath={cohort.source_path}
+              activeJob={activeBidsJob}
+              lastJob={lastBidsJob ?? undefined}
+            />
+          )}
+
+          {activeStage.id === 'meg_scan' && activeGenericConfig && (
+            <MegScanStageForm
+              config={activeGenericConfig as unknown as StageConfigById['meg_scan']}
+              onChange={(key, value) =>
+                handleGenericConfigChange('meg_scan', key, value as string | number | boolean | string[] | null)
+              }
+              subjectIdTypeOptions={megSubjectIdTypeOptions}
+              activeJob={activeBidsJob}
+              lastJob={lastBidsJob ?? undefined}
+            />
+          )}
+
+          {activeStage.id === 'meg_bids' && activeGenericConfig && cohort && (
+            <MegBidsStageForm
+              config={activeGenericConfig as unknown as StageConfigById['meg_bids']}
+              onChange={(key, value) =>
+                handleGenericConfigChange('meg_bids', key, value as string | number | boolean | string[] | null)
+              }
+              cohortName={cohort.name}
+              activeJob={activeBidsJob}
+              lastJob={lastBidsJob ?? undefined}
             />
           )}
         </StageCard>
