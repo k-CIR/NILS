@@ -66,6 +66,21 @@ class MegIngestResult:
         }
 
 
+def get_meg_raw_root(cohort_source_path: str) -> Path:
+    """Cohort raw-workspace root for staged FIF files.
+
+    This is where ``meg_ingest`` copies discovered recordings and where
+    ``meg_scan`` reads them back from. MEG cohorts skip the DICOM anonymize
+    stage entirely (see ``nils_dataset_pipeline.ordering.MEG_PIPELINE_STAGES``:
+    ``meg_ingest -> meg_scan -> meg_bids``), so there is no DICOM-style
+    ``dcm-original``/``dcm-raw`` split (``anonymize.config.setup_derivatives_folders``)
+    to reuse. Staged FIF files instead live under a single
+    ``derivatives/meg-raw`` directory, keeping the same "derivatives" root
+    convention DICOM cohorts use without the DICOM-only original/raw split.
+    """
+    return Path(cohort_source_path).resolve() / "derivatives" / "meg-raw"
+
+
 def discover_fif_files(source_root: Path, preserve_split_files: bool = True) -> list[Path]:
     """Recursively discover raw FIF files under `source_root`.
 

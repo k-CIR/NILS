@@ -272,11 +272,115 @@ def _run_meg_ingest_stage(cohort, stage_idx: int, merged_config: dict):
 def _run_meg_scan_stage(cohort, stage_idx: int, merged_config: dict):
     """Run the MEG scan stage.
 
-    Stage is recognized but not yet implemented; the real handler lands with
-    `backend/src/meg/scanner.py` (see the MEG parallel track plan, task 7).
-    Config shape: `meg.config.MegScanConfig`.
+    Reads FIF headers from the cohort's staged raw workspace
+    (`meg.ingest.get_meg_raw_root`), resolves subject identity, upserts one
+    `study` row per session, and persists `meg_acquisition`/`meg_channel`
+    rows via `meg.extractor.MegExtractor`. Config shape:
+    `meg.config.MegScanConfig`.
     """
-    raise HTTPException(status_code=501, detail="MEG scan stage not implemented yet")
+    from meg.config import MegScanConfig
+    from meg.extractor import MegExtractor, load_participant_subject_code_csv
+    from meg.ingest import get_meg_raw_root
+    from meg.scanner import run_meg_scan
+
+    raw_root = get_meg_raw_root(cohort.source_path)
+
+    subject_id_type_id_raw = merged_config.get('subjectIdTypeId')
+    if subject_id_type_id_raw in (None, "", "null"):
+        subject_id_type_id = None
+    else:
+        try:
+            subject_id_type_id = int(subject_id_type_id_raw)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="subjectIdTypeId must be an integer")
+        subject_id_type_id = _validate_subject_id_type_id(subject_id_type_id)
+
+    subject_code_map: dict[str, str] = {}
+    csv_mapping_path = merged_config.get('subjectCsvMappingPath')
+    if csv_mapping_path:
+        csv_path = Path(csv_mapping_path).expanduser().resolve()
+        if not csv_path.exists():
+            raise HTTPException(status_code=404, detail="Subject code CSV not found")
+        try:
+            subject_code_map = load_participant_subject_code_csv(csv_path)
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="Subject code CSV not found") from None
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Failed to parse subject code CSV: {exc}") from exc
+
+    try:
+        scan_config = MegScanConfig(
+            subject_id_type_id=subject_id_type_id,
+            subject_csv_mapping_path=csv_mapping_path,
+            naming_convention=merged_config.get('namingConvention', 'natmeg'),
+            require_calibration_files=bool(merged_config.get('requireCalibrationFiles', False)),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid MEG scan config: {exc}")
+
+    job = job_service.create_job(
+        stage='meg_scan',
+        config=scan_config.model_dump(mode="json"),
+        name=f"{cohort.name} - meg_scan",
+    )
+    job_service.mark_running(job.id)
+    start_pipeline_step(cohort.id, 'meg_scan', job.id)
+
+    control = JobControl()
+    job_service.register_control(job.id, control)
+
+    extractor = MegExtractor(cohort.id, scan_config, subject_code_map=subject_code_map)
+
+    def progress_cb(payload: dict) -> None:
+        total = payload.get("total") or 0
+        processed = payload.get("processed")
+        if total and processed is not None:
+            try:
+                job_service.update_progress(job.id, min(100, int(processed * 100 / total)))
+            except Exception:
+                pass
+
+    try:
+        scan_result = run_meg_scan(
+            scan_config,
+            raw_root,
+            processor=extractor.scan_recording,
+            progress_callback=progress_cb,
+            control=control,
+            job_id=job.id,
+        )
+    except JobCancelledError:
+        canceled_job = job_service.get_job(job.id)
+        if canceled_job and canceled_job.status != JobStatus.CANCELED:
+            job_service.cancel_job(job.id)
+            canceled_job = job_service.get_job(job.id)
+        fail_pipeline_step(cohort.id, 'meg_scan', error="Job cancelled")
+        return JSONResponse({"job": serialize_job(canceled_job)})
+    except Exception as exc:
+        job_service.mark_failed(job.id, str(exc))
+        fail_pipeline_step(cohort.id, 'meg_scan', error=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc))
+    finally:
+        job_service.unregister_control(job.id)
+
+    # scan_result tracks file-discovery/skip/failure counts; extractor.result
+    # tracks DB-write counts (subjects/studies/acquisitions/channels). Merge
+    # explicitly rather than blindly spreading both dicts: they share a
+    # "failure_count" key, and only scan_result's value (which reflects every
+    # processor exception, including subject-resolution failures raised from
+    # MegExtractor.scan_recording) is meaningful — extractor.result.failures
+    # is never populated internally, since raised exceptions propagate up to
+    # run_meg_scan's per-file try/except instead of being appended there.
+    metrics = scan_result.as_metrics()
+    extractor_metrics = extractor.result.as_metrics()
+    del extractor_metrics["failure_count"]
+    metrics.update(extractor_metrics)
+    job_service.update_progress(job.id, 100)
+    job_service.update_metrics(job.id, metrics)
+    job_service.mark_completed(job.id)
+    complete_pipeline_step(cohort.id, 'meg_scan', metrics=metrics)
+
+    return JSONResponse({"job": serialize_job(job_service.get_job(job.id))})
 
 
 def _run_meg_bids_stage(cohort, stage_idx: int, merged_config: dict):
