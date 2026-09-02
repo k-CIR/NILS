@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 import time
 
-from sqlalchemy import inspect, text
+from sqlalchemy import bindparam, inspect, text
 from sqlalchemy.engine import Connection, Engine
 
 logger = logging.getLogger(__name__)
@@ -82,6 +82,24 @@ def _needs_migration(conn: Connection) -> bool:
     if has_new:
         count = conn.execute(text("SELECT COUNT(*) FROM observation_types")).scalar() or 0
         if count == 0:
+            return True
+
+        # A non-empty table only proves *some* prior run of this migration
+        # happened -- it does not prove every row in OBSERVATION_TYPES_SEED
+        # is present. A deployment migrated before a new seed row was added
+        # to this list (e.g. id 16 / "MEG Scan", added alongside the MEG
+        # parallel track) would otherwise never get that row, since
+        # `_seed_observation_types` is itself per-row idempotent but is
+        # never called once this early-return sees count > 0. Check for any
+        # missing seed id explicitly so newly-added seed rows always land.
+        seed_ids = tuple(row["observation_type_id"] for row in OBSERVATION_TYPES_SEED)
+        present_count = conn.execute(
+            text("SELECT COUNT(*) FROM observation_types WHERE observation_type_id IN :ids").bindparams(
+                bindparam("ids", expanding=True)
+            ),
+            {"ids": seed_ids},
+        ).scalar() or 0
+        if present_count < len(seed_ids):
             return True
 
     return False

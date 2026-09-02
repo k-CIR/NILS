@@ -261,12 +261,78 @@ def run_cohort_stage(cohort_id: int, stage_id: str, config: dict = Body(default=
 def _run_meg_ingest_stage(cohort, stage_idx: int, merged_config: dict):
     """Run the MEG ingest stage.
 
-    Stage is recognized (found via `cohort.stages`/pipeline steps for
-    modality="meg" cohorts) but not yet implemented; the real handler lands
-    with `backend/src/meg/ingest.py` (see the MEG parallel track plan, task 6).
-    Config shape: `meg.config.MegIngestConfig`.
+    Discovers raw FIF recordings under `config.source_path` (defaulting to
+    the cohort source path) and copies them, preserving split-file sets,
+    into the cohort's staged raw workspace (`meg.ingest.get_meg_raw_root`),
+    optionally alongside calibration/crosstalk reference files. Config
+    shape: `meg.config.MegIngestConfig`.
     """
-    raise HTTPException(status_code=501, detail="MEG ingest stage not implemented yet")
+    from meg.config import MegIngestConfig
+    from meg.ingest import get_meg_raw_root, run_meg_ingest
+
+    raw_root = get_meg_raw_root(cohort.source_path)
+
+    try:
+        ingest_config = MegIngestConfig(
+            source_path=merged_config.get('sourcePath') or cohort.source_path,
+            copy_calibration_files=bool(merged_config.get('copyCalibrationFiles', True)),
+            copy_crosstalk_files=bool(merged_config.get('copyCrosstalkFiles', True)),
+            preserve_split_files=bool(merged_config.get('preserveSplitFiles', True)),
+            copy_workers=int(merged_config.get('copyWorkers', 4)),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid MEG ingest config: {exc}")
+
+    job = job_service.create_job(
+        stage='meg_ingest',
+        config=ingest_config.model_dump(mode="json"),
+        name=f"{cohort.name} - meg_ingest",
+    )
+    job_service.mark_running(job.id)
+    start_pipeline_step(cohort.id, 'meg_ingest', job.id)
+
+    control = JobControl()
+    job_service.register_control(job.id, control)
+
+    def progress_cb(payload: dict) -> None:
+        total = payload.get("total") or 0
+        processed = payload.get("processed")
+        if total and processed is not None:
+            try:
+                job_service.update_progress(job.id, min(100, int(processed * 100 / total)))
+            except Exception:
+                pass
+
+    try:
+        ingest_result = run_meg_ingest(
+            ingest_config,
+            cohort.id,
+            raw_root,
+            progress_callback=progress_cb,
+            control=control,
+            job_id=job.id,
+        )
+    except JobCancelledError:
+        canceled_job = job_service.get_job(job.id)
+        if canceled_job and canceled_job.status != JobStatus.CANCELED:
+            job_service.cancel_job(job.id)
+            canceled_job = job_service.get_job(job.id)
+        fail_pipeline_step(cohort.id, 'meg_ingest', error="Job cancelled")
+        return JSONResponse({"job": serialize_job(canceled_job)})
+    except Exception as exc:
+        job_service.mark_failed(job.id, str(exc))
+        fail_pipeline_step(cohort.id, 'meg_ingest', error=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc))
+    finally:
+        job_service.unregister_control(job.id)
+
+    metrics = ingest_result.as_metrics()
+    job_service.update_progress(job.id, 100)
+    job_service.update_metrics(job.id, metrics)
+    job_service.mark_completed(job.id)
+    complete_pipeline_step(cohort.id, 'meg_ingest', metrics=metrics)
+
+    return JSONResponse({"job": serialize_job(job_service.get_job(job.id))})
 
 
 def _run_meg_scan_stage(cohort, stage_idx: int, merged_config: dict):
@@ -386,11 +452,82 @@ def _run_meg_scan_stage(cohort, stage_idx: int, merged_config: dict):
 def _run_meg_bids_stage(cohort, stage_idx: int, merged_config: dict):
     """Run the MEG BIDS export stage.
 
-    Stage is recognized but not yet implemented; the real handler lands with
-    `backend/src/meg/bids_bridge.py` (see the MEG parallel track plan, task 9).
-    Config shape: `meg.config.MegBidsConfig`.
+    Builds a conversion table directly from `meg_acquisition` rows (see
+    `meg.bids_bridge`), writes BIDS output via `mne-bids`, and writes back
+    `bids_status`/`bids_path`/`bids_name` per acquisition. Config shape:
+    `meg.config.MegBidsConfig`.
     """
-    raise HTTPException(status_code=501, detail="MEG BIDS export stage not implemented yet")
+    from meg.bids_bridge import run_meg_bids
+    from meg.config import MegBidsConfig, MegBidsOverwriteMode
+    from meg.ingest import get_meg_raw_root
+
+    raw_root = get_meg_raw_root(cohort.source_path)
+    derivatives_root = raw_root.parent
+
+    try:
+        bids_config = MegBidsConfig(
+            bids_root_name=merged_config.get('bidsRootName', 'bids-meg'),
+            overwrite_mode=MegBidsOverwriteMode(merged_config.get('overwriteMode', 'skip')),
+            dataset_description_name=merged_config.get('datasetDescriptionName', ''),
+            convert_workers=int(merged_config.get('convertWorkers', 4)),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid MEG BIDS config: {exc}")
+
+    bids_root = derivatives_root / bids_config.bids_root_name
+
+    job = job_service.create_job(
+        stage='meg_bids',
+        config=bids_config.model_dump(mode="json"),
+        name=f"{cohort.name} - meg_bids",
+    )
+    job_service.mark_running(job.id)
+    start_pipeline_step(cohort.id, 'meg_bids', job.id)
+
+    control = JobControl()
+    job_service.register_control(job.id, control)
+
+    def progress_cb(payload: dict) -> None:
+        total = payload.get("total") or 0
+        processed = payload.get("processed")
+        if total and processed is not None:
+            try:
+                job_service.update_progress(job.id, min(100, int(processed * 100 / total)))
+            except Exception:
+                pass
+
+    try:
+        bids_result = run_meg_bids(
+            bids_config,
+            cohort.id,
+            cohort.name,
+            raw_root,
+            bids_root,
+            progress_callback=progress_cb,
+            control=control,
+            job_id=job.id,
+        )
+    except JobCancelledError:
+        canceled_job = job_service.get_job(job.id)
+        if canceled_job and canceled_job.status != JobStatus.CANCELED:
+            job_service.cancel_job(job.id)
+            canceled_job = job_service.get_job(job.id)
+        fail_pipeline_step(cohort.id, 'meg_bids', error="Job cancelled")
+        return JSONResponse({"job": serialize_job(canceled_job)})
+    except Exception as exc:
+        job_service.mark_failed(job.id, str(exc))
+        fail_pipeline_step(cohort.id, 'meg_bids', error=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc))
+    finally:
+        job_service.unregister_control(job.id)
+
+    metrics = bids_result.as_metrics()
+    job_service.update_progress(job.id, 100)
+    job_service.update_metrics(job.id, metrics)
+    job_service.mark_completed(job.id)
+    complete_pipeline_step(cohort.id, 'meg_bids', metrics=metrics)
+
+    return JSONResponse({"job": serialize_job(job_service.get_job(job.id))})
 
 
 def _run_anonymize_stage(cohort, stage_idx: int, merged_config: dict):

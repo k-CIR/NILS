@@ -76,10 +76,28 @@ def get_cohort_stats(cohort_name: str, *, engine: Engine) -> dict[str, int]:
 
         total_stacks = stacks_result[0] if stacks_result else 0
 
+        # Count MEG acquisitions for subjects in this cohort. MEG cohorts
+        # never populate series/series_stack (see plan Decisions), so their
+        # "series" figure comes entirely from meg_acquisition instead;
+        # imaging cohorts never populate meg_acquisition, so summing both
+        # counts is safe for either modality.
+        meg_result = conn.execute(
+            text("""
+                SELECT COUNT(*)
+                FROM meg_acquisition ma
+                INNER JOIN subject_cohorts sc ON ma.subject_id = sc.subject_id
+                WHERE sc.cohort_id = :cohort_id
+            """),
+            {"cohort_id": cohort_id},
+        ).fetchone()
+
+        total_meg_acquisitions = meg_result[0] if meg_result else 0
+
         return {
             "total_subjects": total_subjects,
             "total_sessions": total_sessions,
-            "total_series": total_stacks,  # Mapping stacks count to total_series field
+            # Mapping stacks + MEG acquisition counts to total_series field
+            "total_series": total_stacks + total_meg_acquisitions,
         }
 
 
@@ -121,7 +139,11 @@ def get_all_cohort_stats(*, engine: Engine) -> dict[str, dict[str, int]]:
                      JOIN series s ON ss.series_id = s.series_id
                      JOIN study st2 ON s.study_id = st2.study_id
                      JOIN subject_cohorts sc3 ON st2.subject_id = sc3.subject_id
-                     WHERE sc3.cohort_id = c.cohort_id) as stack_count
+                     WHERE sc3.cohort_id = c.cohort_id) as stack_count,
+                    (SELECT COUNT(*)
+                     FROM meg_acquisition ma
+                     JOIN subject_cohorts sc4 ON ma.subject_id = sc4.subject_id
+                     WHERE sc4.cohort_id = c.cohort_id) as meg_acquisition_count
                 FROM cohort c
             """)
         ).fetchall()
@@ -132,7 +154,8 @@ def get_all_cohort_stats(*, engine: Engine) -> dict[str, dict[str, int]]:
             stats[cohort_name] = {
                 "total_subjects": row[1] or 0,
                 "total_sessions": row[2] or 0,
-                "total_series": row[3] or 0,
+                # Stacks (DICOM) + MEG acquisitions combined into one "series" figure.
+                "total_series": (row[3] or 0) + (row[4] or 0),
             }
 
         return stats

@@ -10,6 +10,7 @@ repositories (`cir-utils/tabs/meg-bids/bidsify/` and
 provenance and the specific adaptations made.
 """
 
+from .bids_bridge import MegBidsResult, run_meg_bids  # noqa: F401
 from .bids_writer import create_dataset_description, write_bids_dataset  # noqa: F401
 from .config import (  # noqa: F401
     MegBidsConfig,
