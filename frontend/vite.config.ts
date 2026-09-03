@@ -198,7 +198,7 @@ export default defineConfig(({ mode }) => {
       },
       proxy: {
         '/api': {
-          target: 'http://backend:8000',
+          target: process.env.VITE_API_URL || 'http://backend:8000',
           changeOrigin: true,
           timeout: 600_000,  // 10 min — body-part-qc apply can take minutes
         },

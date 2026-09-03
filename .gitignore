@@ -101,3 +101,9 @@ nils-agent/.deer-flow/threads/
 nils-agent/.deer-flow/shared/memory.json
 nils-agent/.deer-flow/agents/nils-research/memory.json
 nils-agent/.nils-agent/
+
+# Native (Docker-free) local dev setup — scripts/manage-native.sh
+resource/db-native/
+resource/run/
+resource/hf_cache/
+backend/.venv-worker/

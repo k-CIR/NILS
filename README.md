@@ -66,6 +66,7 @@ Specialized branch pipelines handle multi-output acquisitions (SWI, SyMRI, EPIMi
 
 - Docker & Docker Compose
 - 4GB RAM minimum (8GB recommended)
+- Prefer no Docker? See the [Native Setup](#native-docker-free-setup) section below.
 
 ### Start NILS
 
@@ -190,9 +191,68 @@ Environment variables in `.env`:
 
 ---
 
-## License
+## Native (Docker-free) Setup
 
-GNU General Public License v3.0 - see [LICENSE](LICENSE) file.
+The native path runs everything directly on your host &mdash; no Docker
+required. It is intended **for local development only**. Production and remote
+(Karolinska) deployments should continue using the Docker path.
+
+### Prerequisites
+
+**macOS:**
+```bash
+brew install postgresql@16 dcm2niix
+```
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt install postgresql-16
+# Build dcm2niix from source (see backend/Dockerfile for the CMake recipe)
+cmake -DUSE_JPEGLS=ON -DUSE_OPENJPEG=ON ..
+```
+
+Also ensure **Node.js 20+** and **Python 3.11+** are available. The script
+creates `backend/.venv` automatically.
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `start` | Start native Postgres, backend, and frontend |
+| `stop` | Stop all native services |
+| `status` | Show running/stopped state and ports |
+| `test-backend` | Run backend tests (pytest) directly |
+| `test-frontend` | Run frontend tests (vitest) directly |
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--data PATH` | Local DICOM directory (repeatable) |
+| `--forward` | Bind to `0.0.0.0` (host firewall matters directly) |
+| `--clean` | Wipe Postgres data directory (`resource/db-native/`); never touches `--data` paths |
+| `--db-dir PATH` | Override Postgres data directory (default: `resource/db-native/`) |
+| `--with-worker` | Start the optional body-part-qc-worker (CPU-only on macOS; off by default) |
+
+### Quick start
+
+```bash
+./scripts/manage-native.sh start --data /absolute/path/to/dicom/data
+# open http://localhost:5173
+
+./scripts/manage-native.sh stop
+```
+
+### Configuration
+
+Copy and edit the native-specific env files:
+
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
+```
+
+Both the backend and frontend are configured as regular host processes &mdash;
+no volume-mount translation, no container networking.
 
 ---
 
