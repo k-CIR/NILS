@@ -74,11 +74,22 @@ def get_meg_raw_root(cohort_source_path: str) -> Path:
     stage entirely (see ``nils_dataset_pipeline.ordering.MEG_PIPELINE_STAGES``:
     ``meg_ingest -> meg_scan -> meg_bids``), so there is no DICOM-style
     ``dcm-original``/``dcm-raw`` split (``anonymize.config.setup_derivatives_folders``)
-    to reuse. Staged FIF files instead live under a single
-    ``derivatives/meg-raw`` directory, keeping the same "derivatives" root
-    convention DICOM cohorts use without the DICOM-only original/raw split.
+    to reuse.
+
+    Staged FIF files live under a single ``raw`` directory directly under
+    the cohort's source path. This matches the real on-disk `natmeg` vault
+    layout (``vault/natmeg/<project>/raw/sub-<id>/<date>``, with an optional
+    extra ``<acquisition>`` directory between ``raw`` and ``sub-<id>`` also
+    supported) -- see the facility-vault-discovery plan's Decisions #7/#9: for a
+    facility-discovered `natmeg` cohort, `source_path` is set directly to
+    the real project directory, so this function must resolve to
+    `<source_path>/raw` with no extra "derivatives" segment. This is a
+    **global** default change (not facility-discovery-gated): any existing
+    on-disk MEG cohort data still under the old ``derivatives/meg-raw``
+    location must be manually moved/relinked to ``raw`` -- see the plan's
+    Rollout Notes; this is a deployment step, not solved in code.
     """
-    return Path(cohort_source_path).resolve() / "derivatives" / "meg-raw"
+    return Path(cohort_source_path).resolve() / "raw"
 
 
 def discover_fif_files(source_root: Path, preserve_split_files: bool = True) -> list[Path]:

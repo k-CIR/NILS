@@ -76,4 +76,7 @@ export const QUERY_KEYS = {
   filesystem: ['filesystem'] as const,
   dataRoots: ['filesystem', 'data-roots'] as const,
   directory: (path: string) => ['filesystem', path] as const,
+
+  // Facility discovery
+  facilityDiscoveries: ['facility-discoveries'] as const,
 } as const;

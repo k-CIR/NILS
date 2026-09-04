@@ -9,6 +9,7 @@ import { ExportPage } from '../../features/export/pages/ExportPage';
 import { ExportDetailPage } from '../../features/export/pages/ExportDetailPage';
 import { PipelinesPage } from '../../features/pipelines/pages/PipelinesPage';
 import { PipelineDetailPage } from '../../features/pipelines/pages/PipelineDetailPage';
+import { FacilityDiscoveryPage } from '../../features/facility-discovery/pages/FacilityDiscoveryPage';
 import { NotFoundPage } from '../../features/shared/pages/NotFoundPage';
 import { AppLayout } from '../layout/AppLayout';
 
@@ -26,6 +27,7 @@ export const AppRoutes = () =>
         { path: 'export/:jobId', element: <ExportDetailPage /> },
         { path: 'pipelines', element: <PipelinesPage /> },
         { path: 'pipelines/:id', element: <PipelineDetailPage /> },
+        { path: 'facility-discovery', element: <FacilityDiscoveryPage /> },
         { path: 'database', element: <DatabaseManagementPage /> },
         { path: 'settings', element: <SettingsPage /> },
         { path: '*', element: <NotFoundPage /> },

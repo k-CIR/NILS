@@ -18,6 +18,7 @@ from api.routes.metadata_cohorts import router as metadata_cohorts_router
 from api.routes.imports import router as imports_router
 from api.routes.export import router as export_router
 from api.routes.analysis_pipelines import router as analysis_pipelines_router
+from api.routes.facility_discovery import router as facility_discovery_router
 
 __all__ = [
     "system_router",
@@ -39,4 +40,5 @@ __all__ = [
     "imports_router",
     "export_router",
     "analysis_pipelines_router",
+    "facility_discovery_router",
 ]

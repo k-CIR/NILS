@@ -43,6 +43,15 @@ class Cohort(Base):
     # pipeline stage list is initialized for the cohort. See
     # nils_dataset_pipeline/ordering.py for the modality-aware stage lists.
     modality: Mapped[str] = mapped_column(String(20), default='imaging', nullable=False)
+    # Optional link to a cross-facility `project` (see `projects.models.Project`).
+    # NULL for every cohort created outside the facility-discovery flow;
+    # facility-discovery confirm sets this when resolving/creating a
+    # facility+project cohort. Real FK (same app DB as `project`).
+    project_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("project.project_id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
     status: Mapped[str] = mapped_column(String(50), default='idle', nullable=False)
@@ -71,6 +80,7 @@ class CohortDTO(BaseModel):
     tags: list[str] = []
     anonymization_enabled: bool = False
     modality: str = 'imaging'
+    project_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
     status: str = 'idle'
@@ -95,6 +105,11 @@ class CreateCohortPayload(BaseModel):
     # cohort since changing modality after pipeline initialization would
     # invalidate already-created pipeline steps.
     modality: str = 'imaging'
+    # Optional link to a cross-facility `project` (see `projects.models.Project`).
+    # None for every non-facility cohort (default, unchanged behavior).
+    # Used by `facility_discovery.confirm` when resolving/creating a
+    # facility+project cohort.
+    project_id: Optional[int] = None
 
 
 # =============================================================================
@@ -825,3 +840,20 @@ class BodyPartCommitPayload(BaseModel):
 class BodyPartDestagePayload(BaseModel):
     """Payload for ``POST .../body-part-qc/destage``."""
     stack_ids: list[int]
+
+
+# `Cohort.project_id` is a real ForeignKey to `project.project_id`. SQLAlchemy
+# only resolves that string reference when mappers are configured or DDL is
+# compiled (e.g. `Base.metadata.create_all(...)`), so the `Project` table must
+# be registered on this shared `Base.metadata` by then. Importing it here
+# guarantees that *any* consumer of `cohorts.models.Base` (including test
+# fixtures that build an isolated engine from this metadata alone) sees the
+# `project` table too, without requiring every call site to remember to also
+# import `projects.models`.
+#
+# This sits at the bottom of the module (not the top) because
+# `projects/models.py` itself does `from cohorts.models import Base`, which
+# would otherwise be a circular import. By the time Python reaches this line,
+# `Base` already exists in this module's namespace, so the circular import
+# resolves cleanly.
+from projects.models import Project  # noqa: E402,F401

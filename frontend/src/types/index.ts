@@ -8,3 +8,4 @@ export * from './meg';
 export * from './system';
 export * from './database';
 export * from './import';
+export * from './facility-discovery';

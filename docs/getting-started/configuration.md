@@ -31,6 +31,25 @@ Configuration is managed through the `.env` file in the project root.
 | `DB_DATA_DIR` | `./resource/db` | PostgreSQL data directory |
 | `BACKUP_DIR` | `./resource/backups` | Backup storage location |
 
+### Facility Vault Discovery (optional)
+
+Only required to use the facility discovery scan/confirm endpoints
+(auto-detecting `mrc`/`natmeg` facility subjects/sessions already on disk,
+then confirming them into `project`/`cohort`/`subject` records). All
+server-side paths, no secrets. None of these have a default value -- each
+must be explicitly set to enable the corresponding endpoint(s); where a value
+says "directory auto-created if missing", that describes what happens on
+disk once the path is configured, not a fallback for leaving the variable
+unset. See [Cohort](../cohort/index.md) docs for the discovery review
+workflow.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FACILITY_VAULT_ROOT` | - | Root of the shared vault layout: `<root>/mrc/sub-<id>`, `<root>/natmeg/<project>/raw/sub-<id>/<date>` (an optional extra `<acquisition>` directory between `raw` and `sub-<id>` is also supported). Required for `POST /api/facility-discovery/scan`. |
+| `FACILITY_MAPPING_CSV_PATH` | - | Facility-maintained cross-facility subject/project mapping CSV; fully reloaded on every scan (no upload endpoint in v1). Required for `POST /api/facility-discovery/scan`. |
+| `MRC_STAGING_ROOT` | - | Per-project symlink staging root for confirmed `mrc` subjects (directory auto-created if missing). Required to confirm an `mrc` discovery; not used by `natmeg`. |
+| `FACILITY_SUBJECT_CODE_CSV_ROOT` | - | Directory of generated per-cohort subject-code override CSVs (directory auto-created if missing). NILS writes one CSV per cohort here mapping the raw facility identifier to the CIR subject code, wired into the existing extract/meg_scan CSV-override mechanism so extraction uses the CIR ID instead of the raw facility identifier -- this is NILS's own generated output, distinct from `FACILITY_MAPPING_CSV_PATH`. Required to confirm a discovery of either facility. |
+
 ## Example Configuration
 
 ```bash

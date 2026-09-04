@@ -156,6 +156,19 @@ def _ensure_application_schema() -> None:
             "Analysis-pipeline models not available - skipping table creation"
         )
 
+    # Import facility-discovery models to ensure they're registered with
+    # CohortsBase.metadata (facility_subject_mappings / facility_discoveries),
+    # so a restore of a backup taken before this feature shipped still gets
+    # these tables recreated. (`projects.models.Project` is already
+    # guaranteed to be registered here too, since `cohorts.models` imports it
+    # at its own module level for `Cohort.project_id`'s foreign key.)
+    try:
+        from facility_discovery import models as _facility_discovery_models  # noqa: F401
+    except ImportError:
+        logger.warning(
+            "Facility-discovery models not available - skipping table creation"
+        )
+
     CohortsBase.metadata.create_all(engine, checkfirst=True)
     logger.info("Ensured cohorts and related tables exist")
 

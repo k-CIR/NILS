@@ -265,6 +265,28 @@ ensure_backend_venv() {
   fi
 }
 
+# Load backend/.env into the current (sub)shell's exported environment, if
+# present. python-dotenv is NOT used by the app itself (see backend/.env.example),
+# so without this, any var that's only set in backend/.env (e.g.
+# FACILITY_MAPPING_CSV_PATH, FACILITY_VAULT_ROOT, MRC_STAGING_ROOT,
+# FACILITY_SUBJECT_CODE_CSV_ROOT, APP_ACCESS_TOKEN) never reaches the backend
+# process started by this script, even though it's documented/present on disk.
+#
+# Callers must `env VAR=... cmd` the script-managed vars (DATABASE_URL,
+# METADATA_DATABASE_URL, DATA_ROOTS, PYTHONPATH, ...) AFTER calling this, so
+# those always win over whatever the same key happens to be set to in
+# backend/.env -- this only fills in the vars the script itself doesn't
+# already manage.
+load_backend_env_file() {
+  local env_file="$BACKEND_DIR/.env"
+  if [[ -f "$env_file" ]]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "$env_file"
+    set +a
+  fi
+}
+
 start_backend() {
   local port="$1" pg_port="$2" bind_host="$3"
 
@@ -284,6 +306,7 @@ start_backend() {
   echo "Starting backend on http://${bind_host}:${port} ..."
   (
     cd "$BACKEND_DIR"
+    load_backend_env_file
     env PYTHONPATH="$BACKEND_DIR/src" \
         DATABASE_URL="$database_url" \
         METADATA_DATABASE_URL="$metadata_url" \
@@ -326,6 +349,7 @@ start_worker() {
   echo "  HF models will be downloaded on first use into: $hf_cache"
   (
     cd "$BACKEND_DIR"
+    load_backend_env_file
     env PYTHONPATH="$BACKEND_DIR/src" \
         HF_HOME="$hf_cache" \
         BODY_PART_DEVICE="${BODY_PART_DEVICE:-cpu}" \

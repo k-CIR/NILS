@@ -21,12 +21,19 @@ import {
   IconShieldCheck,
   IconFileExport,
   IconBinaryTree2,
+  IconFolderSearch,
 } from '@tabler/icons-react';
 import { useMemo } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useJobsQuery } from '../../features/jobs/api';
 
 const navigationItems = [
+  {
+    label: 'Facility Discovery',
+    icon: IconFolderSearch,
+    to: '/facility-discovery',
+    description: 'Vault subject review',
+  },
   { label: 'Cohorts', icon: IconStack2, to: '/cohorts', description: 'Manage datasets' },
   { label: 'QC Pipeline', icon: IconShieldCheck, to: '/qc', description: 'Quality control' },
   { label: 'Export', icon: IconFileExport, to: '/export', description: 'Subset export' },

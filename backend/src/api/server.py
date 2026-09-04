@@ -110,6 +110,7 @@ def create_app() -> FastAPI:
         imports_router,
         export_router,
         analysis_pipelines_router,
+        facility_discovery_router,
     )
     from api.routes.qc import router as qc_router
     from api.routes.files import set_data_roots
@@ -137,6 +138,7 @@ def create_app() -> FastAPI:
     app.include_router(imports_router)
     app.include_router(export_router)
     app.include_router(analysis_pipelines_router)
+    app.include_router(facility_discovery_router)
     app.include_router(qc_router)
 
     # Reconcile stage-job status at startup

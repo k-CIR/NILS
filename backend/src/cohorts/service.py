@@ -44,6 +44,24 @@ class CohortService:
         if self._initialized:
             return
         try:
+            # Register facility-vault-discovery tables on the shared app-DB
+            # Base before computing tables_to_create, so they're included in
+            # create_all below. `project` must be registered before `cohorts`
+            # is created on fresh installs since `cohorts.project_id` carries
+            # a real FK to `project.project_id`.
+            try:
+                from projects.models import Project  # noqa: F401
+                from facility_discovery.models import (  # noqa: F401
+                    FacilityDiscovery,
+                    FacilitySubjectMapping,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Facility-discovery models not available - skipping their "
+                    "table registration: %s",
+                    e,
+                )
+
             # Create only cohort-specific tables (not pipeline_steps which needs jobs table)
             # Pipeline steps table is created by the migration script with raw SQL
             # Use .tables.values() instead of .sorted_tables to avoid FK resolution errors
@@ -127,6 +145,19 @@ class CohortService:
                     e,
                 )
 
+            # Facility-vault-discovery: cohorts.project_id FK column.
+            try:
+                from cohorts.migrations.add_cohort_project_id_column import (
+                    ensure_migrated as ensure_cohort_project_id_column,
+                )
+
+                ensure_cohort_project_id_column()
+            except Exception as e:
+                logger.warning(
+                    "Cohort project_id-column migration failed (non-fatal): %s",
+                    e,
+                )
+
         except Exception as exc:  # pragma: no cover
             raise RuntimeError("Failed to initialize cohort tables") from exc
         self._initialized = True
@@ -152,6 +183,11 @@ class CohortService:
                 # Modality is fixed at creation and intentionally not
                 # updated here: changing it after pipeline initialization
                 # would invalidate already-created pipeline steps.
+                if payload.project_id is not None and existing.project_id is None:
+                    # Only ever fills in a missing link (e.g. facility
+                    # discovery re-confirming); never clobbers an existing
+                    # project_id for an unrelated cohort of the same name.
+                    existing.project_id = payload.project_id
                 existing.updated_at = datetime.now(timezone.utc)
                 session.flush()
                 session.refresh(existing)
@@ -173,6 +209,7 @@ class CohortService:
                     tags=tags,
                     anonymization_enabled=payload.anonymization_enabled,
                     modality=normalized_modality,
+                    project_id=payload.project_id,
                 )
                 session.refresh(cohort)
                 dto = CohortDTO.model_validate(cohort)
@@ -213,7 +250,7 @@ class CohortService:
 
             # Enrich with stats from metadata database
             try:
-                stats = get_cohort_stats(cohort.name, engine=metadata_engine)
+                stats = get_cohort_stats(cohort.name, engine=metadata_engine, fallback_cohort_id=cohort.id)
                 dto.total_subjects = stats["total_subjects"]
                 dto.total_sessions = stats["total_sessions"]
                 dto.total_series = stats["total_series"]
@@ -244,7 +281,8 @@ class CohortService:
 
             # Enrich with stats from metadata database
             try:
-                all_stats = get_all_cohort_stats(engine=metadata_engine)
+                fallback_cohort_ids = {dto.name.lower(): dto.id for dto in dtos}
+                all_stats = get_all_cohort_stats(engine=metadata_engine, fallback_cohort_ids=fallback_cohort_ids)
                 for dto in dtos:
                     cohort_name = dto.name.lower()
                     if cohort_name in all_stats:

@@ -33,9 +33,14 @@ from nils_dataset_pipeline.models import NilsDatasetPipelineStep
 # tables this test needs into a private `MetaData` instance alongside a
 # minimal stub `jobs(id)` table, so SQLAlchemy's DDL compiler can resolve the
 # FK target without touching global state.
+#
+# `Cohort.project_id` also carries a real FK to `project.project_id` (see the
+# facility-vault-discovery plan), so a minimal stub `project(project_id)`
+# table is needed here for the same reason as `jobs` above.
 def _make_test_engine():
     local_metadata = MetaData()
     Table("jobs", local_metadata, Column("id", Integer, primary_key=True))
+    Table("project", local_metadata, Column("project_id", Integer, primary_key=True))
     Cohort.__table__.to_metadata(local_metadata)
     NilsDatasetPipelineStep.__table__.to_metadata(local_metadata)
 

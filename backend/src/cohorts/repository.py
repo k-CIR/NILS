@@ -19,6 +19,7 @@ def create_cohort(
     tags: list[str] = None,
     anonymization_enabled: bool = False,
     modality: str = 'imaging',
+    project_id: Optional[int] = None,
 ) -> Cohort:
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
@@ -29,6 +30,7 @@ def create_cohort(
         tags=tags or [],
         anonymization_enabled=anonymization_enabled,
         modality=modality,
+        project_id=project_id,
         created_at=now,
         updated_at=now,
         status='idle',
